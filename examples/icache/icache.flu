@@ -1,0 +1,153 @@
+pub struct Bus<'dir> {
+    // the bus needs to know how wide its address and data is
+    // if we don't use generics/parameters and instead use constant
+    // expressions, I guess we have to define it inside the bus struct somehow
+    // This then leads to the problem that we did not wanted to have types
+    // without width, i.e. we wanted to have int<32> or something. For some
+    // constants enforcing a width just makes no sense, e.g. bus widths
+    addr_width: const uint[?],
+    data_width: const uint[?],
+
+    req_addr:   'dir logic[addr_width],
+    req_valid:  'dir logic,
+    req_ready: !'dir logic,
+
+    rsp_data:  !'dir logic[data_width],
+    rsp_valid: !'dir logic,
+    rsp_ready:  'dir logic,
+}
+
+pub trait Bus {
+    trans req(addr: logic[self.addr_width]) {
+        self.req_valid == '1';
+        self.req_ready == '1';
+        self.req_addr  == addr;
+        self.clk.trigger();
+    }
+
+    trans rsp(data: logic[self.data_width]) {
+        self.rsp_valid == '1';
+        self.rsp_ready == '1';
+        self.rsp_data  == data;
+        self.clk.trigger();
+    }
+}
+
+pub struct icache<BusSlave : Bus, BusMaster: Bus> {
+    clk : in async rise logic,
+    rst : in async low  logic,
+    slave<'in>   : BusSlave,
+    master<'out> : BusMaster,
+}
+
+impl icache {
+    // module instantiation in this way?
+    let tag_data : icache_tag_data;
+
+    fsm serve_and_refill {
+        // stateful/sequential variables
+        let master_addr: logic[master.addr_width];
+
+        // default assignments for non-stateful variables
+        tag_data.req   = '0';
+        tag_data.write = '0';
+
+        // variables without default assignments just turn don't care? That
+        // would make writing code very easy without "over"-assigning
+        // variables. e.g. we could set tag_data.addr to 0 here, and only write
+        // it when we actually need it later in IDLE
+        // However, if we assume it turns don't care, tag_data.addr can be
+        // wired to the transaction directly without any additional logic
+
+        upon self.rst.trigger() {
+            goto IDLE;
+        }
+
+        state IDLE {
+            let addr : logic[self.slave.addr_width];
+
+            upon self.slave.req(addr) {
+                // extend/truncate to self.master.addr_width and pad with 0 if necesary
+                master_addr = logic::to_width(addr, self.master.addr_width, '0');
+
+                tag_data.req = '1';
+                tag_data.addr = addr;
+
+                goto CACHE_RESP;
+            }
+        }
+
+        state CACHE_RESP {
+            if tag_data.found {
+                exec self.slave.rsp(tag_data.data);
+                goto IDLE;
+            } else {
+                exec self.master.req(master_addr);
+                goto WAIT_MASTER_RESP;
+            }
+        }
+
+        state WAIT_MASTER_RESP {
+            let data : logic[master.data_width];
+            upon self.master.rsp(data) {
+                // let's just assume data width is identical, I'm lazy...
+                tag_data.req = '1';
+                tag_data.write = '1';
+                tag_data.data = data;
+                exec self.slave.rsp(data);
+                goto IDLE;
+            }
+        }
+    }
+}
+
+struct icache_tag_data {
+    addr_width: const uint[?],
+    data_width: const uint[?],
+
+    req:     in  logic,
+    write:   in  logic,
+    addr:    in  logic[addr_width],
+    data_in: in  logic[addr_width],
+
+    data_out: out logic[data_width],
+    found:    out logic,
+}
+
+impl icache_tag_data {
+    let tag_width : const uint[?];
+    let tag_mem: logic[1024][tag_width+1];
+    let data_mem: logic[1024][self.data_width];
+
+    // might be a stupid idea to directly access a dimension which might be
+    // defined by a constant? :-D
+    let offset = ceil(log(self.data_width));
+    tag_width = self.addr_width - ceil(log(self.tag_mem.dim(0))) - offset;
+    let bank_addr_width = self.addr_width - tag_width - offset;
+
+    let bank_addr = self.addr[bank_addr_width+offset-1:offset];
+
+    let tag_next = self.addr[self.addr_width - 1:self.addr_width - tag_width];
+    let tag_expected;
+
+    let tag;
+    let valid;
+
+    sequential {
+        if (self.req) {
+            if (self.write) {
+                tag_mem[bank_addr]  = tag_next;
+                data_mem[bank_addr] = self.data_in;
+            } else {
+                {valid, tag} = tag_mem[bank_addr];
+                data_out     = data_mem[bank_addr];
+            }
+        }
+    }
+
+    sequential {
+        tag_expected = tag_next;
+    }
+
+    found = (tag_expected == tag) && valid;
+}
