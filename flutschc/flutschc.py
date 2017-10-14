@@ -11,3 +11,7 @@ parser.add_argument("filename", help="filename.fl")
 args = parser.parse_args()
 
 print(args.filename)
+
+lexer = Lexer(args.filename)
+parser = Parser(lexer)
+parser.parse()
