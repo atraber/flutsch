@@ -1,0 +1,90 @@
+SYMBOL_TOKENS = "
+. DOT
+, COMMA
+; SEMICOLON
+: COLON
+"
+
+IDENT -> [A-Za-z_][A-Za-z0-9_]*     (isLetter?)
+NUM_LIT -> [0-9]+
+
+OPERATORS = "
+! NOT
+== EQ
+!= NEQ
+<= LEQ
+>= GEQ
+> GT
+< LT
+= ASSIGN
++ ADD
+- SUB
+* MUL
+/ DIV
+|| LOR
+&& LAND
+"
+KEYWORDS = "
+struct STRUCT
+trans|on|if|for|while|fork|let|fsm|clk|in"
+
+PAR = "
+{ LBRACE
+} RBRACE
+( LPAR
+) RPAR
+[ LBRACK
+] RBRACK
+"
+EOF
+
+API:
+    open()
+    pop()
+
+# GRAMAR:
+root := {unit}* EOF
+unit := struct|fsm|trans
+struct := STRUCT IDENT LBRACE struct_field* RBRACE
+fsm := FSM IDENT LBRACE stmt* RBRACE
+trans := TRANS IDENT LPAR {arg {COMMA arg}* COMMA?}? RPAR ON IDENT LBRACE stmt* RBRACE
+arg := IDENT COLON type
+struct_field := IDENT COLON NOT? type SEMICOLON
+type := "int" LT NUM_LIT GT
+stmt := IDENT ASSIGN expr SEMICOLON
+        FOR IDENT IN expr LBRACE stmt* RBRACE
+        WHILE expr LBRACE stmt* RBRACE
+        IF expr LBRACE stmt* RBRACE {ELSE IF expr LBRACE stmt* RBRACE}* {ELSE LBRACE stmt* RBRACE}?
+        CLK SEMICOLON
+        SEMICOLON
+        FORK LBRACE stmt* RBRACE
+        LET IDENT {COLON type}? SEMICOLON
+        LBRACE stmt* RBRACE
+expr := or_expr
+or_expr := and_expr
+           or_expr LOR and_expr
+and_expr := rel_expr
+            and_expr LAND rel_expr
+rel_expr := add_expr
+            add_expr EQ  add_expr
+            add_expr NEQ add_expr
+            add_expr LEQ add_expr
+            add_expr GEQ add_expr
+            add_expr GT  add_expr
+            add_expr LT  add_expr
+add_expr := mul_expr
+            add_expr ADD mul_expr
+            add_expr SUB mul_expr
+mul_expr := unary_expr
+            mul_expr MUL unary_expr
+            mul_expr DIV unary_expr
+unary_expr := mem_expr
+              ADD mem_expr
+              SUB mem_expr
+              NOT mem_expr
+              mem_expr LPAR {expr {COMMA expr}* COMMA?}? RPAR
+mem_expr := primary_expr
+            mem_expr DOT IDENT
+primary_expr := IDENT
+                NUM_LIT
+                LPAR expr RPAR

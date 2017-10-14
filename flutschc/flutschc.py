@@ -5,6 +5,8 @@
 # Description: UVM Scaffolding
 
 import argparse
+from lexer import Lexer
+from parser import Parser
 
 parser = argparse.ArgumentParser(description='Flutsch compiler')
 parser.add_argument("filename", help="filename.fl")

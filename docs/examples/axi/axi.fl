@@ -57,17 +57,18 @@ trans do (addr: int32, user: int0, id: int8, burst: int2, len: int8, size: int3)
     Ax.addr = addr;
     Ax.id   = id;
     Ax.burst = burst;
-    while (!valid) clk();
+    Ax.id * 4 + 8 = 0;
+    while !valid { clk; }
     addr = Ax.addr;
     id = Ax.id;
-    while (!ready || !valid) clk();
-    clk();
+    while !ready && asdf || !valid || b && c && d { clk; }
+    clk;
 }
 
 trans write (addr : int32, data : [int64]) on AXI {
     fork {
         AXI.Aw.do(addr, data.len);
-        for (d in data) {
+        for d in data {
             AXI.W.do(d);
         }
     }
@@ -77,7 +78,7 @@ trans write (addr : int32, data : [int64]) on AXI {
 trans read (addr : int32, data : int64) on sram {
     sram.addr = addr;
     sram.we = false;
-    clk();
+    clk;
     data = sram.data;
 }
 
@@ -85,7 +86,7 @@ fsm axi2sram {
     let addr;
     let data;
 
-    wait: {
+    {
         fork {
             ax.do(addr);
             sram.read(addr, data);
@@ -93,12 +94,12 @@ fsm axi2sram {
     }
 }
 
-sram.we = false;
-ready = 1;
-while (!valid) clk();
-addr = Ax.addr;
-sram.addr = addr;
-id = Ax.id;
-while (!valid) clk();
-clk();
-data = sram.data;
+# sram.we = false;
+# ready = 1;
+# while (!valid) clk();
+# addr = Ax.addr;
+# sram.addr = addr;
+# id = Ax.id;
+# while (!valid) clk();
+# clk();
+# data = sram.data;
