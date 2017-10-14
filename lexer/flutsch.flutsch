@@ -1,0 +1,104 @@
+struct Ax {
+    id     :   int8;
+    addr   :   int32;
+    len    :   int8;
+    size   :   int3;
+    burst  :   int2;
+    lock   :   int1;
+    cache  :   int4;
+    prot   :   int3;
+    region :   int4;
+    user   :   int0;
+    qos    :   int4;
+    valid  :   int1;
+    ready  : ! int1;
+}
+
+struct W {
+    data  :   int64;
+    strb  :   int8;
+    last  :   int1;
+    user  :   int0;
+    valid :   int1;
+    ready : ! int1;
+}
+
+struct R {
+    id    :   int8;
+    data  :   int64;
+    resp  :   int2;
+    last  :   int1;
+    user  :   int0;
+    valid :   int1;
+    ready : ! int1;
+}
+
+struct B {
+    id    :   int8;
+    resp  :   int2;
+    last  :   int1;
+    user  :   int0;
+    valid :   int1;
+    ready : ! int1;
+}
+
+
+struct AXI {
+    AR :   Ax;
+    AW :   Ax;
+    W  :   W;
+    R  : ! R;
+    B  : ! B;
+}
+
+trans do (addr: int32, user: int0, id: int8, burst: int2, len: int8, size: int3) on Ax {
+    ready = 1;
+    valid = 1;
+    Ax.addr = addr;
+    Ax.id   = id;
+    Ax.burst = burst;
+    while (!valid) clk();
+    addr = Ax.addr;
+    id = Ax.id;
+    while (!ready || !valid) clk();
+    clk();
+}
+
+trans write (addr : int32, data : [int64]) on AXI {
+    fork {
+        AXI.Aw.do(addr, data.len);
+        for (d in data) {
+            AXI.W.do(d);
+        }
+    }
+    AXI.B.do();
+}
+
+trans read (addr : int32, data : int64) on sram {
+    sram.addr = addr;
+    sram.we = false;
+    clk();
+    data = sram.data;
+}
+
+fsm axi2sram {
+    let addr;
+    let data;
+
+    wait: {
+        fork {
+            ax.do(addr);
+            sram.read(addr, data);
+        }
+    }
+}
+
+sram.we = false;
+ready = 1;
+while (!valid) clk();
+addr = Ax.addr;
+sram.addr = addr;
+id = Ax.id;
+while (!valid) clk();
+clk();
+data = sram.data;
