@@ -1,0 +1,106 @@
+module apb2sram (apb : APB, sram: ! SRAMBus)  {
+
+    fsm {
+
+        fork {
+            apb.read(addr, data);
+            sram.read(addr, data);
+        }
+
+        fork {
+            apb.write(addr, data);
+            sram.write(addr, data);
+        }
+    }
+}
+
+struct APB {
+    addr    :   int32;
+    rdata   : ! int32;
+    wdata   :   int32;
+    en      :   int1;
+    strb    :   int4;
+    ready   : ! int1;
+    write   :   int1;
+    sel     :   int1;
+}
+
+struct SRAM {
+    addr    :   int32;
+    rdata   : ! int32;
+    wdata   :   int32;
+    wen     :   int;
+}
+
+trans read (addr : int32, data : int32) on APB {
+    self.sel = 1;
+    self.en = 0;
+    self.write = 0;
+    self.addr = addr;
+    addr = self.addr;
+    clk;
+    self.en = 1;
+    self.ready = 1;
+    self.rdata = data;
+    while !self.ready { clk; }
+    data = self.rdata;
+    clk;
+}
+
+trans write (addr : int32, data : int32) on APB {
+    self.sel = 1;
+    self.en = 0;
+    self.write = 1;
+    self.wdata = data;
+    self.addr = addr;
+    self.strb = 15;
+    addr = self.addr;
+    data = self.wdata;
+    clk;
+    self.en = 1;
+    self.ready = 1;
+    while !self.ready { clk; }
+    clk;
+}
+
+trans read (addr : int32, data : int32) on SRAM {
+    self.addr = addr;
+    addr = self.addr;
+
+    if self.we == 0 {
+        self.we = 0;
+    }
+
+    clk;
+    data = self.rdata;
+}
+
+trans write (addr : int32, data : int32) on SRAM {
+    self.addr = addr;
+    addr = self.addr;
+    self.we = 1;
+    self.wdata = data;
+    data = self.wdata;
+    clk;
+}
+
+# READ
+Req (Master):
+
+self.addr = addr;
+self.we = 0;
+clk;
+data = self.rdata;
+
+1. Assignments to outputs
+2. Reads from inputs
+
+Resp (Slave):
+
+addr = self.addr;
+self.we = 0;
+clk;
+data = self.rdata;
+
+1. Assignment to inputs
+2.
