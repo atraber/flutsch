@@ -29,7 +29,7 @@ write_master {
 }
 
 read_slave {
-	while sel != 1 && en == 0 && write == 0 { clk; }
+	while sel != 1 && en != 0 && write != 0 { clk; }
 	let @ADDR = addr;
 	clk;
 	assert(en == 1);
@@ -41,7 +41,7 @@ read_slave {
 }
 
 write_slave {
-	while sel != 1 && en == 0 && write == 1 { clk; }
+	while sel != 1 && en != 0 && write != 1 { clk; }
 	let @ADDR = addr;
 	let @DATA = wdata;
 	clk;
@@ -52,7 +52,7 @@ write_slave {
 }
 
 rw_slave {
-	while sel != 1 && en == 0 { clk; }
+	while sel != 1 && en != 0 { clk; }
 	let @ADDR = addr;
 	if write == 0 {}
 	if write == 1 {
@@ -68,4 +68,12 @@ rw_slave {
 	clk;
 	// ready <= 0;
 	// rdata <= X;
+}
+
+read_monitor {
+	while sel != 1 && en != 0 && write != 0 { clk; }
+	clk;
+	assert(en == 1);
+	while !ready { clk; }
+	clk;
 }
