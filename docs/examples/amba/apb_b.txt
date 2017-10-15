@@ -1,0 +1,47 @@
+module MyMagicSRAM (
+	input  logic        clk,
+	input  logic        rst_n,
+	input  logic [31:0] bus_addr,
+	output logic [31:0] bus_rdata,
+	input  logic [31:0] bus_wdata,
+	input  logic        bus_wen
+);
+
+
+
+endmodule
+
+
+/*
+INITIAL:
+	-- bus.read  --> INITIAL (A)
+	-- bus.write --> INITIAL (B)
+
+---------------------------
+
+INITIAL:
+	self.addr = addrA;    (A)
+    addrA = self.addr;    (A)
+	let tmpA = addrA;     (A)
+    self.we = 0;          (A)
+    ---
+    dataA = words[tmpA];  (A)
+    self.rdata = dataA;   (A)
+    dataA = self.rdata;   (A)
+    -> INITIAL;           (A)
+
+---------------------------
+
+INITIAL:
+    self.addr = addrB;    (B)
+    addrB = self.addr;    (B)
+    let tmpAB = addrB;    (B)
+    self.we = 1;          (B)
+    self.wdata = dataB;   (B)
+    dataB = self.wdata;   (B)
+    let tmpDB = dataB;    (B)
+    ---
+    words[tmpAB] = tmpDB; (B)
+	-> INITIAL;           (B)
+
+*/
