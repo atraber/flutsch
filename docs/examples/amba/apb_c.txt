@@ -1,0 +1,71 @@
+read_master {
+	sel <= 1;
+	en <= 0;
+	write <= 0;
+	addr <= @ADDR;
+	clk;
+	en <= 1;
+	while !ready { clk; }
+	let @DATA = rdata;
+	clk;
+	// sel  <= 0;
+	// en   <= 0;
+	// addr <= X;
+}
+
+write_master {
+	sel <= 1;
+	en <= 0;
+	write <= 1;
+	addr <= @ADDR;
+	wdata <= @DATA;
+	clk;
+	en <= 1;
+	while !ready { clk; }
+	clk;
+	// sel  <= 0;
+	// en   <= 0;
+	// addr <= X;
+}
+
+read_slave {
+	while sel != 1 && en == 0 && write == 0 { clk; }
+	let @ADDR = addr;
+	clk;
+	assert(en == 1);
+	ready <= 1;
+	rdata <= @DATA;
+	clk;
+	// ready <= 0;
+	// rdata <= X;
+}
+
+write_slave {
+	while sel != 1 && en == 0 && write == 1 { clk; }
+	let @ADDR = addr;
+	let @DATA = wdata;
+	clk;
+	assert(en == 1);
+	ready <= 1;
+	clk;
+	// ready <= 0;
+}
+
+rw_slave {
+	while sel != 1 && en == 0 { clk; }
+	let @ADDR = addr;
+	if write == 0 {}
+	if write == 1 {
+		let @DATA = wdata;
+	}
+	clk;
+	assert(en == 1);
+	ready <= 1;
+	if write == 0 {
+		rdata <= @DATA;
+	}
+	if write == 1 {}
+	clk;
+	// ready <= 0;
+	// rdata <= X;
+}

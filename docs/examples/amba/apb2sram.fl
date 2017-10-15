@@ -1,5 +1,4 @@
-module apb2sram (apb : APB, sram: ! SRAMBus)  {
-
+module apb2sram (apb: APB, sram: ! SRAMBus) {
     fsm {
 
         fork {
@@ -63,15 +62,43 @@ trans write (addr : int32, data : int32) on APB {
     clk;
 }
 
+# "Formal" description
+trans read (addr: int32, data: int32) on APB {
+    nop { clk; }
+    property self.sel == 1;
+    property self.en == 0;
+    property self.write == 0;
+    property self.addr == addr;
+    clk;
+    property self.en == 1;
+    nop { clk; }
+    property self.ready == 1;
+    property self.rdata == data;
+    clk;
+    release;
+}
+
+trans write (addr: int32, data: int32) on APB {
+    nop { clk; }
+    property self.sel == 1;
+    property self.en == 0;
+    property self.write == 1;
+    property self.addr == addr;
+    property self.wdata == data;
+    clk;
+    property self.en == 1;
+    nop { clk; }
+    property self.ready == 1;
+    clk;
+    release;
+}
+
 trans read (addr : int32, data : int32) on SRAM {
     self.addr = addr;
     addr = self.addr;
-
-    if self.we == 0 {
-        self.we = 0;
-    }
-
+    self.we = 0;
     clk;
+    self.data = rdata;
     data = self.rdata;
 }
 
@@ -82,6 +109,43 @@ trans write (addr : int32, data : int32) on SRAM {
     self.wdata = data;
     data = self.wdata;
     clk;
+}
+
+struct Reg<T> {
+    value: T,
+}
+
+tran set (value: const T) on Reg<T> {
+    let tmp = value;
+    clk;
+    self.value = tmp;
+}
+
+tran get (value: T) on Reg<T> {
+    value = self.value;
+}
+
+module MyMagicSRAM (bus: in SRAM) {
+    let words: [Reg<int32>; 1024];
+
+    fsm {
+        INITIAL: {
+            let addr;
+            let data;
+            with bus.read(addr, data) {
+                let tmp = addr;
+                clk;
+                data = words[tmp];
+            }
+            with bus.write(addr, data) {
+                let tmpA = addr;
+                let tmpD = data;
+                clk;
+                words[tmpA] = tmpD;
+            }
+            with epsilon { clk; }
+        }
+    }
 }
 
 # READ
